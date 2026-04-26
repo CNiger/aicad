@@ -1,0 +1,6 @@
+flask==3.0.0
+flask-cors==4.0.1
+httpx==0.25.2
+groq==0.4.2
+pydantic==2.5.0
+build123d==0.6.0

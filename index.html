@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAD Agent — Industrial 3D Model Generator</title>
+    <style>
+        :root {
+            --metal-base: #171a1f;
+            --metal-panel: #1f232a;
+            --metal-canvas: #1e2129;
+            --metal-border: #3a3e48;
+            --text-primary: #eef2f8;
+            --text-secondary: #9ca3b5;
+            
+            --orange-pulse: #ff5500;
+            --orange-active: #e6451a;
+            --orange-glow: #b53a0a;
+            --orange-preview: #ff8c42;
+            
+            --cyan-system: #00a6c4;
+            --cyan-sensor: #2a9d8f;
+            
+            --success: #4caf50;
+            --error: #ff5e5e;
+            --warning: #ffb347;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--metal-base);
+            background-image: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.02) 0px,
+                rgba(255, 255, 255, 0.02) 1px,
+                transparent 1px,
+                transparent 12px
+            );
+            font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', monospace;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Typography */
+        h1, h2, h3 {
+            font-family: 'Major Mono Display', 'JetBrains Mono', monospace;
+            font-weight: 400;
+            letter-spacing: -0.5px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: var(--orange-pulse);
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            border-left: 3px solid var(--orange-pulse);
+            padding-left: 12px;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            border-bottom: 1px solid var(--metal-border);
+            padding: 20px 30px;
+            background: var(--metal-panel);
+            box-shadow: inset 0 -1px 0 rgba(255,85,0,0.1);
+        }
+
+        .header-sub {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            margin-top: 8px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--metal-panel);
+            border: 1px solid var(--metal-border);
+            border-radius: 2px;
+            box-shadow: inset 0 0 0 1px rgba(255,85,0,0.05), 0 4px 12px rgba(0,0,0,0.4);
+            overflow: hidden;
+        }
+
+        .panel-left {
+            flex: 0 0 380px;
+        }
+
+        .panel-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel-header {
+            background: var(--metal-base);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--metal-border);
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        .panel-body {
+            padding: 20px;
+        }
+
+        /* Input area */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        textarea {
+            width: 100%;
+            background: var(--metal-canvas);
+            border: 1px solid var(--metal-border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            padding: 12px;
+            border-radius: 2px;
+            resize: vertical;
+            transition: all 0.08s linear;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--orange-active);
+            box-shadow: 0 0 0 2px rgba(255,85,0,0.2);
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--metal-base);
+            border: 1px solid var(--metal-border);
+            color: var(--text-primary);
+            font-family: monospace;
+            padding: 10px 20px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.08s linear;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translateY(1px);
+            border-color: var(--orange-active);
+            box-shadow: 0 2px 8px rgba(255,85,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+        }
+
+        .btn-primary {
+            background: var(--orange-active);
+            border-color: var(--orange-pulse);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--orange-pulse);
+            box-shadow: 0 2px 12px rgba(255,85,0,0.4);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        /* Examples */
+        .examples {
+            margin-top: 20px;
+        }
+
+        .example-item {
+            background: var(--metal-canvas);
+            border: 1px solid var(--metal-border);
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.08s linear;
+        }
+
+        .example-item:hover {
+            border-color: var(--orange-glow);
+            transform: translateX(4px);
+        }
+
+        /* Output */
+        .output-area {
+            background: var(--metal-canvas);
+            border: 1px solid var(--metal-border);
+            border-radius: 2px;
+            padding: 16px;
+            min-height: 300px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .status-bar {
+            background: var(--metal-base);
+            border-top: 1px solid var(--orange-glow);
+            padding: 8px 16px;
+            font-size: 0.7rem;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .status-led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-led.error {
+            background: var(--error);
+        }
+
+        .status-led.warning {
+            background: var(--warning);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* 3D Viewer */
+        .viewer-container {
+            background: var(--metal-canvas);
+            min-height: 500px;
+            position: relative;
+        }
+
+        #canvas-3d {
+            width: 100%;
+            height: 500px;
+            display: block;
+        }
+
+        .viewer-controls {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            border-top: 1px solid var(--metal-border);
+        }
+
+        /* Animations */
+        @keyframes powerFlash {
+            0% { box-shadow: 0 0 0 0 var(--orange-pulse); border-color: var(--orange-pulse); }
+            70% { box-shadow: 0 0 0 12px rgba(255,85,0,0); border-color: var(--orange-pulse); }
+            100% { box-shadow: 0 0 0 0 rgba(255,85,0,0); border-color: var(--metal-border); }
+        }
+
+        .power-flash {
+            animation: powerFlash 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--metal-panel);
+            border: 1px solid var(--orange-pulse);
+            padding: 20px 40px;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--metal-border);
+            border-top-color: var(--orange-pulse);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .panel-left {
+                flex: auto;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--metal-base);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--metal-border);
+            border-radius: 2px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--orange-glow);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>// CAD_AGENT.exe</h1>
+            <div class="header-sub">
+                [INDUSTRIAL_LOFT_ENGINE v2.0] — Generative 3D modeling via loft operations
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Panel: Input -->
+            <div class="panel panel-left">
+                <div class="panel-header">// INPUT_BUFFER</div>
+                <div class="panel-body">
+                    <div class="input-group">
+                        <label>> model_description:</label>
+                        <textarea id="description" rows="6" placeholder="Опишите 3D модель...&#10;&#10;Пример:&#10;Создай цилиндрическую деталь высотой 40 мм, диаметром 30 мм. Сделай сквозное отверстие диаметром 5 мм по центру."></textarea>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="generateBtn" onclick="generateModel()">
+                            [GENERATE]
+                        </button>
+                        <button class="btn" id="clearBtn" onclick="clearInput()">
+                            [CLEAR]
+                        </button>
+                    </div>
+
+                    <div class="examples">
+                        <label>> quick_presets:</label>
+                        <div class="example-item" onclick="setExample('cylinder')">
+                            📦 Cylinder with hole — Цилиндр с отверстием
+                        </div>
+                        <div class="example-item" onclick="setExample('box')">
+                            📦 Box with pillars — Коробка с колоннами
+                        </div>
+                        <div class="example-item" onclick="setExample('tapered')">
+                            📦 Tapered cylinder — Конус/усечённый конус
+                        </div>
+                        <div class="example-item" onclick="setExample('complex')">
+                            🔧 Complex — Основание + цилиндр + куб + отверстия
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Output -->
+            <div class="panel-right">
+                <div class="panel viewer-container">
+                    <div class="panel-header">// 3D_VIEWPORT</div>
+                    <canvas id="canvas-3d"></canvas>
+                    <div class="viewer-controls">
+                        <button class="btn" onclick="resetView()">[RESET_VIEW]</button>
+                        <button class="btn" id="downloadStlBtn" onclick="downloadSTL()" disabled>[DOWNLOAD_STL]</button>
+                        <button class="btn" id="downloadStepBtn" onclick="downloadSTEP()" disabled>[DOWNLOAD_STEP]</button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">// GENERATION_LOG</div>
+                    <div class="output-area" id="outputLog">
+                        [SYSTEM] Ready. Enter model description.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-led" id="statusLed"></div>
+            <span id="statusText">[IDLE] AWAITING_INPUT</span>
+            <span style="flex:1"></span>
+            <span id="timestamp"></span>
+        </div>
+    </div>
+
+    <div class="loading" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div>[PROCESSING] GENERATING_MODEL...</div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+        // Three.js setup
+        const canvas = document.getElementById('canvas-3d');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1e2129);
+        scene.fog = new THREE.FogExp2(0x1e2129, 0.008);
+
+        const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        camera.position.set(5, 5, 5);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.zoomSpeed = 1.2;
+        controls.rotateSpeed = 1.0;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x2a2e3a);
+        scene.add(ambientLight);
+        
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+        mainLight.position.set(2, 5, 3);
+        scene.add(mainLight);
+        
+        const fillLight = new THREE.PointLight(0x445566, 0.5);
+        fillLight.position.set(-2, 1, 4);
+        scene.add(fillLight);
+        
+        const backLight = new THREE.PointLight(0xff5500, 0.3);
+        backLight.position.set(0, 2, -3);
+        scene.add(backLight);
+        
+        const rimLight = new THREE.PointLight(0x00a6c4, 0.4);
+        rimLight.position.set(1, 2, -2);
+        scene.add(rimLight);
+        
+        // Grid helper (industrial style)
+        const gridHelper = new THREE.GridHelper(20, 20, 0xff5500, 0x3a3e48);
+        gridHelper.position.y = -0.5;
+        scene.add(gridHelper);
+        
+        // Simple axis helper
+        const axesHelper = new THREE.AxesHelper(3);
+        axesHelper.material.transparent = true;
+        axesHelper.material.opacity = 0.2;
+        scene.add(axesHelper);
+
+        let currentModel = null;
+
+        function resetView() {
+            camera.position.set(5, 5, 5);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function loadSTLFromBase64(base64Data, color = 0xff5500) {
+            if (currentModel) {
+                scene.remove(currentModel);
+            }
+            
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            const loader = new STLLoader();
+            const geometry = loader.parse(bytes.buffer);
+            
+            // Center geometry
+            geometry.computeBoundingBox();
+            const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+            geometry.translate(-center.x, -center.y, -center.z);
+            
+            const material = new THREE.MeshStandardMaterial({
+                color: color,
+                metalness: 0.85,
+                roughness: 0.35,
+                emissive: 0x221100,
+                emissiveIntensity: 0.15
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+            currentModel = mesh;
+            
+            // Adjust camera
+            const size = geometry.boundingBox.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const distance = maxDim * 2;
+            camera.position.set(distance, distance * 0.8, distance);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // Make functions global for inline handlers
+        window.resetView = resetView;
+        window.downloadSTL = () => {
+            if (window.currentStlBase64) {
+                const link = document.createElement('a');
+                link.href = 'data:application/octet-stream;base64,' + window.currentStlBase64;
+                link.download = `model_${window.currentTimestamp || 'export'}.stl`;
+                link.click();
+            }
+        };
+        
+        window.downloadSTEP = () => {
+            if (window.currentStepBase64) {
+                const link = document.createElement('a');
+                link.href = 'data:application/octet-stream;base64,' + window.currentStepBase64;
+                link.download = `model_${window.currentTimestamp || 'export'}.step`;
+                link.click();
+            }
+        };
+    </script>
+
+    <script>
+        // Non-module functions
+        const statusLed = document.getElementById('statusLed');
+        const statusText = document.getElementById('statusText');
+        const outputLog = document.getElementById('outputLog');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const generateBtn = document.getElementById('generateBtn');
+        const downloadStlBtn = document.getElementById('downloadStlBtn');
+        const downloadStepBtn = document.getElementById('downloadStepBtn');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '[ERR]' : (type === 'success' ? '[OK]' : '[INFO]');
+            const color = type === 'error' ? '#ff5e5e' : (type === 'success' ? '#4caf50' : '#9ca3b5');
+            outputLog.innerHTML += `<div style="color: ${color}">${prefix} ${message}</div>`;
+            outputLog.scrollTop = outputLog.scrollHeight;
+            
+            document.getElementById('timestamp').innerHTML = timestamp;
+        }
+
+        function setStatus(status, isError = false) {
+            statusText.innerHTML = status;
+            if (isError) {
+                statusLed.className = 'status-led error';
+            } else {
+                statusLed.className = 'status-led';
+            }
+        }
+
+        function showLoading(show) {
+            loadingOverlay.classList.toggle('active', show);
+            generateBtn.disabled = show;
+        }
+
+        function clearInput() {
+            document.getElementById('description').value = '';
+            log('Input cleared');
+        }
+
+        function setExample(type) {
+            const examples = {
+                cylinder: 'Создай цилиндрическую деталь высотой 40 мм, диаметром 30 мм. Сделай сквозное отверстие диаметром 5 мм по центру.',
+                box: 'Создай коробку с основанием 50x50 мм, высотой 10 мм. На верхней грани сделай 4 цилиндрические колонны высотой 20 мм и диаметром 8 мм по углам.',
+                tapered: 'Создай усечённый конус высотой 50 мм, нижний диаметр 40 мм, верхний диаметр 20 мм.',
+                complex: 'Создай деталь: основание 60x60 мм высотой 8 мм. На основании цилиндр высотой 25 мм диаметром 20 мм. На цилиндре куб 12x12 мм высотой 6 мм. Сделай 4 сквозных отверстия диаметром 4 мм по углам основания.'
+            };
+            document.getElementById('description').value = examples[type] || '';
+            log(`Loaded preset: ${type}`);
+        }
+
+        async function generateModel() {
+            const description = document.getElementById('description').value.trim();
+            if (!description) {
+                log('ERROR: Empty description', 'error');
+                setStatus('[ERR] INPUT_REQUIRED', true);
+                return;
+            }
+            
+            log(`Processing: "${description.substring(0, 100)}..."`);
+            setStatus('[BUSY] GENERATING_MODEL');
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    log(`ERROR: ${data.error}`, 'error');
+                    setStatus('[ERR] GENERATION_FAILED', true);
+                    if (data.plan) {
+                        log(`Plan received: ${JSON.stringify(data.plan, null, 2)}`, 'info');
+                    }
+                    showLoading(false);
+                    return;
+                }
+                
+                if (data.success) {
+                    log(`SUCCESS: Model generated at ${data.timestamp}`, 'success');
+                    setStatus('[OK] MODEL_READY');
+                    
+                    window.currentTimestamp = data.timestamp;
+                    
+                    if (data.stl_base64) {
+                        window.currentStlBase64 = data.stl_base64;
+                        downloadStlBtn.disabled = false;
+                        
+                        // Load into Three.js viewer
+                        if (typeof loadSTLFromBase64 !== 'undefined') {
+                            loadSTLFromBase64(data.stl_base64);
+                        } else {
+                            // Fallback for module scope
+                            setTimeout(() => {
+                                const event = new CustomEvent('stl-ready', { detail: data.stl_base64 });
+                                window.dispatchEvent(event);
+                            }, 100);
+                        }
+                        log('STL model loaded into viewer');
+                    } else {
+                        log('WARNING: No STL data received', 'warning');
+                    }
+                    
+                    if (data.step_base64) {
+                        window.currentStepBase64 = data.step_base64;
+                        downloadStepBtn.disabled = false;
+                        log('STEP file ready for download');
+                    }
+                    
+                    if (data.code) {
+                        log(`Generated code (${data.code.length} chars)`, 'success');
+                    }
+                    
+                    // Flash effect
+                    const panel = document.querySelector('.viewer-container');
+                    panel.classList.add('power-flash');
+                    setTimeout(() => panel.classList.remove('power-flash'), 200);
+                    
+                    if (navigator.vibrate) navigator.vibrate(50);
+                } else {
+                    log('ERROR: Unknown response format', 'error');
+                }
+            } catch (err) {
+                log(`NETWORK ERROR: ${err.message}`, 'error');
+                setStatus('[ERR] CONNECTION_FAILED', true);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Make functions global
+        window.generateModel = generateModel;
+        window.clearInput = clearInput;
+        window.setExample = setExample;
+        window.downloadSTL = window.downloadSTL;
+        window.downloadSTEP = window.downloadSTEP;
+        
+        // Initial log
+        log('[SYSTEM] CAD Agent initialized');
+        log('[READY] Loft engine online');
+        
+        // Handle STL loading from module
+        window.addEventListener('stl-ready', (e) => {
+            if (typeof loadSTLFromBase64 !== 'undefined') {
+                loadSTLFromBase64(e.detail);
+            }
+        });
+    </script>
+</body>
+</html>
